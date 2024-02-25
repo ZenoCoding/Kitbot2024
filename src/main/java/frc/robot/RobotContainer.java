@@ -47,6 +47,7 @@ public class RobotContainer {
      */
     private void configureBindings() {
         // Set the default command for the drivetrain to drive using the joysticks
+        // Commenting out this line of code makes autonomous work.
         drivetrain.setDefaultCommand(
             new RunCommand(
                 () ->
