@@ -4,13 +4,14 @@
 
 package frc.robot.subsystems;
 
+import com.kauailabs.navx.frc.AHRS;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import com.revrobotics.RelativeEncoder;
-import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj2.command.PIDSubsystem;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 import static frc.robot.Constants.DrivetrainConstants.*;
 
@@ -21,7 +22,7 @@ import static frc.robot.Constants.DrivetrainConstants.*;
  * for control. Subsystems are a mechanism that, when used in conjuction with command "Requirements", ensure
  * that hardware is only being used by 1 command at a time.
  */
-public class Drivetrain extends PIDSubsystem {
+public class Drivetrain extends SubsystemBase {
     /*Class member variables. These variables represent things the class needs to keep track of and use between
     different method calls. */
     private final DifferentialDrive m_drivetrain;
@@ -31,13 +32,12 @@ public class Drivetrain extends PIDSubsystem {
     private final CANSparkMax rightRear;
     private final RelativeEncoder leftEncoder;
     private final RelativeEncoder rightEncoder;
+    private final AHRS gyro = new AHRS(SPI.Port.kMXP);
 
     /*Constructor. This method is called when an instance of the class is created. This should generally be used to set up
      * member variables and perform any configuration or set up necessary on hardware.
      */
     public Drivetrain() {
-        super(new PIDController(kP, kI, kD));
-        getController().setTolerance(0.05);
 
         leftFront = new CANSparkMax(kLeftFrontID, MotorType.kBrushless);
         leftRear = new CANSparkMax(kLeftRearID, MotorType.kBrushless);
@@ -62,10 +62,10 @@ public class Drivetrain extends PIDSubsystem {
         rightRear.setSecondaryCurrentLimit(SECONDARY_CURRENT_LIMIT);
 
         // Set idle modes of motors
-        leftFront.setIdleMode(CANSparkMax.IdleMode.kCoast);
-        rightFront.setIdleMode(CANSparkMax.IdleMode.kCoast);
-        leftRear.setIdleMode(CANSparkMax.IdleMode.kCoast);
-        rightRear.setIdleMode(CANSparkMax.IdleMode.kCoast);
+        leftFront.setIdleMode(CANSparkMax.IdleMode.kBrake);
+        rightFront.setIdleMode(CANSparkMax.IdleMode.kBrake);
+        leftRear.setIdleMode(CANSparkMax.IdleMode.kBrake);
+        rightRear.setIdleMode(CANSparkMax.IdleMode.kBrake);
 
         // Set the rear motors to follow the front motors.
         leftRear.follow(leftFront);
@@ -82,39 +82,29 @@ public class Drivetrain extends PIDSubsystem {
     }
 
     private void initTelemetry() {
-        SmartDashboard.putNumber("DRIVE_PIDF_P", kP);
-        SmartDashboard.putNumber("DRIVE_PIDF_I", kI);
-        SmartDashboard.putNumber("DRIVE_PIDF_D", kD);
-        SmartDashboard.putNumber("Drive SetPoint", getSetpoint());
+        SmartDashboard.putNumber("DRIVE_PIDF_P", DRIVE_P);
+        SmartDashboard.putNumber("DRIVE_PIDF_I", DRIVE_I);
+        SmartDashboard.putNumber("DRIVE_PIDF_D", DRIVE_D);
+        SmartDashboard.putNumber("TURN_PIDF_P", TURN_P);
+        SmartDashboard.putNumber("TURN_PIDF_I", TURN_I);
+        SmartDashboard.putNumber("TURN_PIDF_D", TURN_D);
     }
 
     private void updateTelemetry() {
-        kP = SmartDashboard.getNumber("DRIVE_PIDF_P", kP);
-        kI = SmartDashboard.getNumber("DRIVE_PIDF_I", kI);
-        kD = SmartDashboard.getNumber("DRIVE_PIDF_D", kD);
-        if (getController().getP() != kP
-                || getController().getI() != kI
-                || getController().getD() != kD) {
-          System.out.println("Setting new PID");
-          getController().setPID(kP, kI, kD);
-        }
+        DRIVE_P = SmartDashboard.getNumber("DRIVE_PIDF_P", DRIVE_P);
+        DRIVE_I = SmartDashboard.getNumber("DRIVE_PIDF_I", DRIVE_I);
+        DRIVE_D = SmartDashboard.getNumber("DRIVE_PIDF_D", DRIVE_D);
+        TURN_P = SmartDashboard.getNumber("TURN_PIDF_P", TURN_P);
+        TURN_I = SmartDashboard.getNumber("TURN_PIDF_I", TURN_I);
+        TURN_D = SmartDashboard.getNumber("TURN_PIDF_D", TURN_D);
 
-        if (SmartDashboard.getNumber("Drive SetPoint", getSetpoint()) != getSetpoint()) {
-            setpoint(SmartDashboard.getNumber("Drive SetPoint", getSetpoint()));
-            enable();
-        }
+
+        SmartDashboard.putNumber("heading", getHeading());
     }
 
 
-    public void setpoint(double setpoint) {
-        SmartDashboard.putNumber("Drive SetPoint", setpoint);
-        setSetpoint(setpoint);
-    }
-
-    @Override
     public void periodic() {
-        super.periodic();
-        SmartDashboard.putNumber("Drive Encoder Position", getMeasurement());
+        SmartDashboard.putNumber("Drive Encoder Position", getPosition());
         updateTelemetry();
     }
 
@@ -123,35 +113,45 @@ public class Drivetrain extends PIDSubsystem {
         rightEncoder.setPosition(0);
         System.out.println("Left: " + leftEncoder.getPosition());
         System.out.println("Right: " + rightEncoder.getPosition());
-        assert getMeasurement() == 0;
-    }
-
-    public boolean atSetpoint() {
-        return getController().atSetpoint();
+        assert getPosition() == 0;
     }
 
 
     /*Method to control the drivetrain using arcade drive. Arcade drive takes a speed in the X (forward/back) direction
      * and a rotation about the Z (turning the robot about it's center) and uses these to control the drivetrain motors */
     public void arcadeDrive(double speed, double rotation) {
-        disable();
         speed = Math.pow(speed, 3);
         rotation = Math.pow(rotation, 3);
         m_drivetrain.arcadeDrive(speed, rotation, false);
+    }
+
+    public void arcadeDriveRawTurning(double speed, double rotation){
+        speed = Math.pow(speed, 3);
+        m_drivetrain.arcadeDrive(speed, rotation);
     }
 
     public void rawArcadeDrive(double speed, double rotation){
         m_drivetrain.arcadeDrive(speed, rotation, false);
     }
 
-    @Override
-    protected void useOutput(double output, double setpoint) {
-        SmartDashboard.putNumber("DriveTrain Output: ", output);
-        m_drivetrain.arcadeDrive(output, 0, false);
+    public double getPosition() {
+        return (leftEncoder.getPosition() + rightEncoder.getPosition())/2;
     }
 
-    @Override
-    public double getMeasurement() {
-        return (leftEncoder.getPosition() + rightEncoder.getPosition())/2;
+    public double getHeading(){
+        return gyro.getYaw() * -1;
+    }
+
+    public double getTurnRate() {
+        return gyro.getRate()*-1;
+    }
+
+    public void zeroHeading() {
+        gyro.zeroYaw();
+    }
+
+    public void setHeading(double angle) {
+        gyro.zeroYaw();
+        gyro.setAngleAdjustment(angle);
     }
 }

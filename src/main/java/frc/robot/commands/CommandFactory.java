@@ -29,7 +29,23 @@ public class CommandFactory {
                 .withTimeout(Constants.LauncherConstants.kLauncherDelay)
                 .andThen(intake.getOuttakeCommand())
                 .handleInterrupt(launcher::stop)
-                .withTimeout(4);
+                .withTimeout(2);
     }
 
+    public Command intakeDownAndRoll(){
+        return intake.getArmToGroundCommand()
+                .andThen(intake.getIntakeCommand());
+    }
+
+    public Command intakeDown(){
+        return intake.getArmToGroundCommand();
+    }
+
+
+    public Command intakeUp(){
+        return intake
+                .getArmToStowCommand()
+                .deadlineWith(intake.getIntakeCommand())
+                .finallyDo(intake::stopRoller);
+    }
 }

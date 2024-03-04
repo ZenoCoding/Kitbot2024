@@ -4,8 +4,12 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.PIDCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.OperatorConstants;
@@ -14,8 +18,7 @@ import frc.robot.subsystems.Drivetrain;
 import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Launcher;
 
-// import frc.robot.subsystems.CANDrivetrain;
-// import frc.robot.subsystems.CANLauncher;
+import static frc.robot.Constants.DrivetrainConstants.*;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -28,16 +31,27 @@ public class RobotContainer {
     private final Drivetrain drivetrain = new Drivetrain();
     private final Launcher launcher = new Launcher();
     private final Intake intake = new Intake();
+    SendableChooser<Command> autoChooser = new SendableChooser<>();
 
     /*The gamepad provided in the KOP shows up like an XBox controller if the mode switch is set to X mode using the
      * switch on the top.*/
-    private final CommandXboxController m_driverController =
+    private final CommandXboxController driverController =
         new CommandXboxController(OperatorConstants.kDriverControllerPort);
+
+    private final CommandXboxController operatorController = new CommandXboxController(OperatorConstants.kOperatorControllerPort);
 
     /** The container for the robot. Contains subsystems, OI devices, and commands. */
     public RobotContainer() {
       // Configure the trigger bindings
       configureBindings();
+      autoChooser.setDefaultOption("Two Note Center", Autos.centerAuto(drivetrain, launcher, intake));
+      autoChooser.addOption("Shoot and Leave", Autos.shootLeaveAuto(drivetrain, launcher, intake));
+      autoChooser.addOption("Shoot", Autos.shootAuto(drivetrain, launcher, intake));
+      autoChooser.addOption("Do Nothing", Autos.doNothing());
+      autoChooser.addOption("BLUE Wide Auto", Autos.wideAuto(drivetrain, launcher, intake, Autos.AllianceColor.BLUE));
+      autoChooser.addOption("RED Wide Auto", Autos.wideAuto(drivetrain, launcher, intake, Autos.AllianceColor.RED));
+      autoChooser.addOption("Rotation Show", Autos.rotateAuto(drivetrain));
+      SmartDashboard.putData(autoChooser);
     }
 
     /**
@@ -52,14 +66,31 @@ public class RobotContainer {
             new RunCommand(
                 () ->
                     drivetrain.arcadeDrive(
-                        -m_driverController.getLeftY(), -m_driverController.getRightX()),
+                        -driverController.getLeftY(), -driverController.getRightX()),
                 drivetrain));
+
+        // Self correcting drive command when the right bumper is held
+        driverController
+            .rightBumper()
+                    .whileTrue(
+                        new PIDCommand(
+                                new PIDController(
+                                        STABILIZATION_P,
+                                        STABILIZATION_I,
+                                        STABILIZATION_D),
+                                drivetrain::getTurnRate,
+                                0,
+                                (double output) -> drivetrain.arcadeDriveRawTurning(-driverController.getLeftY(), output),
+                                drivetrain));
 
         // Set up a binding to run the intake command while the operator is pressing and holding the
         // left Bumper
-        m_driverController
+        driverController
             .leftBumper()
-            .whileTrue(intake.getArmToGroundCommand().andThen(intake.getIntakeCommand()))
+            .whileTrue(
+                    intake.getArmToGroundCommand()
+                    .andThen(intake.getIntakeCommand())
+            )
             .onFalse(
                 intake
                     .getArmToStowCommand()
@@ -68,7 +99,7 @@ public class RobotContainer {
 
         /*Create an inline sequence to run when the operator presses and holds the A (green) button. Run the PrepareLaunch
          * command for 1 seconds and then run the LaunchNote command */
-        m_driverController
+        driverController
             .rightTrigger()
             .whileTrue(
                 launcher
@@ -77,7 +108,7 @@ public class RobotContainer {
                     .andThen(intake.getOuttakeCommand())
                     .handleInterrupt(launcher::stop));
 
-        m_driverController
+        driverController
             .leftTrigger()
             .whileTrue(
                 intake.getArmToAmpCommand()
@@ -89,7 +120,7 @@ public class RobotContainer {
             )
             .onFalse(intake.getArmToStowCommand().finallyDo(intake::stopRoller));
 
-        m_driverController
+        driverController
             .y()
             .onTrue(
                 new InstantCommand(
@@ -99,13 +130,14 @@ public class RobotContainer {
                     },
                     intake));
 
-        m_driverController.x().whileTrue(intake.shootIntake().handleInterrupt(intake::stopRoller));
+        driverController.x().whileTrue(intake.shootIntake().handleInterrupt(intake::stopRoller));
 
-        m_driverController.b().whileTrue(intake.getIntakeCommand().handleInterrupt(intake::stopRoller));
+        driverController.b().whileTrue(intake.getIntakeCommand().handleInterrupt(intake::stopRoller));
 
-        m_driverController.y().whileTrue(intake.fastIntake().handleInterrupt(intake::stopRoller));
+        driverController.y().whileTrue(intake.fastIntake().handleInterrupt(intake::stopRoller));
 
-        m_driverController.rightBumper().onTrue(new InstantCommand(intake::resetEncoder));
+        operatorController.rightBumper().onTrue(new InstantCommand(intake::resetEncoder));
+        operatorController.leftBumper().onTrue(new InstantCommand(intake::resetEncoder));
     }
 
     /**
@@ -114,7 +146,7 @@ public class RobotContainer {
      * @return the command to run in autonomous
      */
     public Command getAutonomousCommand() {
-        // An example command will be run in autonomous
-        return Autos.exampleAuto(drivetrain, launcher, intake);
+
+        return autoChooser.getSelected();
     }
 }

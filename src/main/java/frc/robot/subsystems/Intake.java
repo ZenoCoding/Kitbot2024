@@ -136,8 +136,7 @@ public class Intake extends SubsystemBase {
           () -> {
             setRoller(ROLLER_INTAKE_SPEED);
             System.out.println("Intaking...");
-          },
-          this::stopRoller);
+          }, this::stopRoller);
     }
 
     public Command getOuttakeCommand() {

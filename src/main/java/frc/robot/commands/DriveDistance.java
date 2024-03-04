@@ -1,44 +1,42 @@
 package frc.robot.commands;
 
-import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.wpilibj2.command.PIDCommand;
 import frc.robot.subsystems.Drivetrain;
 
-public class DriveDistance extends Command {
-    private final double distance;
+import static frc.robot.Constants.DrivetrainConstants.*;
+
+public class DriveDistance extends PIDCommand {
     private final Drivetrain drivetrain;
 
     public DriveDistance(Drivetrain drivetrain, double distance) {
-        // Use addRequirements() here to declare subsystem dependencies.
-        // Configure additional PID options by calling getController() and getPIDController()
+        super(
+                new PIDController(DRIVE_P, DRIVE_I, DRIVE_D),
+                drivetrain::getPosition,
+                distance,
+                output -> drivetrain.rawArcadeDrive(output, 0),
+                drivetrain);
+
+        getController().setTolerance(DRIVE_TOLERANCE);
         this.drivetrain = drivetrain;
-        this.distance = distance;
-        addRequirements(drivetrain);
     }
 
     // Called when the command is initially scheduled.
     @Override
     public void initialize() {
-        drivetrain.enable();
-        System.out.println("Starting Distance: " + drivetrain.getMeasurement());
+        super.initialize();
         drivetrain.resetEncoders();
-        System.out.println("Current Distance: "  + drivetrain.getMeasurement());
-        drivetrain.setpoint(distance);
-        System.out.println("Setpoint: " + drivetrain.getSetpoint());
     }
 
     // Called once the command ends or is interrupted.
     @Override
     public void end(boolean interrupted) {
-        System.out.println("Finished! Interrupted: " + interrupted);
-        System.out.println("Position: " + drivetrain.getMeasurement() + " Setpoint: " + drivetrain.getSetpoint());
-
+        super.end(interrupted);
         drivetrain.rawArcadeDrive(0, 0);
-        drivetrain.disable();
     }
 
-    // Returns true when the command should end.
     @Override
     public boolean isFinished() {
-        return drivetrain.atSetpoint();
+        return getController().atSetpoint();
     }
 }

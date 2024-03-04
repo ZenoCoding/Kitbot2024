@@ -33,14 +33,30 @@ public final class Constants {
     public static final int SECONDARY_CURRENT_LIMIT = 60;
 
     // Encoder conversion factors
-    public static final double WHEEL_DIAMETER = 0.145;
+    public static final double WHEEL_DIAMETER = 0.15;
     public static final double GEAR_RATIO = 1/8.46;
     public static final double ENCODER_CONVERSION_FACTOR = WHEEL_DIAMETER * Math.PI * GEAR_RATIO;
 
     // PID constants for the drivetrain
-    public static double kP = 0.1;
-    public static double kI = 0.0;
-    public static double kD = 0.0;
+    public static double DRIVE_P = 0.15;
+    public static double DRIVE_I = 0.1;
+    public static double DRIVE_D = 0.05;
+    public static double DRIVE_TOLERANCE = 0.05;
+
+    // Turning Constants
+    public static double TURN_P = 0.0065;
+    public static double TURN_I = 0.002;
+    public static double TURN_D = 0.001;
+
+    public static final double TURN_TOLERANCE_DEG = 2;
+    public static final double TURN_RATE_TOLERANCE_DEG_PER_S = 3;
+
+    // Stabilization Constants
+    public static final double STABILIZATION_P = 0.0065;
+    public static final double STABILIZATION_I = 0.002;
+    public static final double STABILIZATION_D = 0.0;
+
+
   }
 
   public static class LauncherConstants {
@@ -60,7 +76,7 @@ public final class Constants {
     public static final double kLauncherSpeed = 1;
     public static final double kIntakeLauncherSpeed = -1;
 
-    public static final double kLauncherDelay = 1;
+    public static final double kLauncherDelay = 0.7;
   }
 
   public static class IntakeConstants {
@@ -82,7 +98,7 @@ public final class Constants {
     public static double ARM_V = 0.095;
     public static double ARM_A = 0.0;
 
-    public static final double ROLLER_INTAKE_SPEED = 0.3;
+    public static final double ROLLER_INTAKE_SPEED = 0.6;
     public static final double ROLLER_OUTTAKE_SPEED = -0.2;
     public static double ROLLER_SHOOT_SPEED = -1;
     public static double ROLLER_RECOVER_SPEED = 1;
